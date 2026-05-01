@@ -1,0 +1,360 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--cream);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 32px;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+}
+.logo {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--charcoal);
+}
+.logo em { color: var(--sage-dark); font-style: italic; }
+
+.homeBtn {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--warm);
+  color: var(--charcoal);
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+  transition: background 0.15s;
+}
+.homeBtn:hover { background: #e8e0d6; }
+
+.main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 32px 24px;
+}
+
+/* Loading */
+.loadingCard {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  padding: 48px 40px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  align-self: center;
+}
+.spinner {
+  width: 56px; height: 56px;
+  border: 4px solid #eee;
+  border-top-color: var(--sage);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loadingCard h2 { font-size: 1.4rem; color: var(--charcoal); }
+.loadingCard p  { font-size: 0.88rem; color: var(--stone); max-width: 340px; }
+.loadingSteps   { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 8px; }
+.loadStep {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: #ccc;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+.stepDone  { color: var(--sage-dark); background: #f0f5f1; }
+.stepActive2 { color: var(--charcoal); background: var(--warm); font-weight: 500; }
+.stepDot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* Error */
+.errorCard {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  padding: 48px 40px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  align-self: center;
+}
+.errorIcon { color: var(--coral); }
+.errorCard h2 { font-size: 1.4rem; }
+.errorCard p  { font-size: 0.88rem; color: var(--stone); }
+.demoNote {
+  background: var(--warm);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 0.82rem !important;
+  text-align: left !important;
+  line-height: 1.6;
+}
+.demoNote code { background: #eee; padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+.errorActions { display: flex; gap: 12px; }
+.retryBtn {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--sage);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+
+/* Results wrapper */
+.resultsWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 680px;
+}
+
+.demoBanner {
+  background: #FFF8E1;
+  border: 1px solid #FFD54F;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 0.84rem;
+  color: #5D4037;
+  line-height: 1.5;
+}
+.demoBanner code { background: rgba(0,0,0,0.08); padding: 1px 5px; border-radius: 4px; }
+
+/* Disease card */
+.diseaseCard {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  box-shadow: var(--shadow);
+  border: 2px solid transparent;
+}
+.urgentCard { border-color: var(--danger); }
+.urgentBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+.diseaseTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+.diagnosisLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--sage-dark);
+  margin-bottom: 6px;
+}
+.diseaseName {
+  font-size: clamp(1.6rem, 3vw, 2rem);
+  color: var(--charcoal);
+  margin-bottom: 10px;
+}
+.diseaseDesc {
+  font-size: 0.9rem;
+  color: var(--stone);
+  line-height: 1.6;
+  max-width: 400px;
+}
+
+/* Confidence ring */
+.confidenceRing {
+  position: relative;
+  width: 90px; height: 90px;
+  flex-shrink: 0;
+}
+.ringsvg { width: 100%; height: 100%; }
+.ringText {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  gap: 1px;
+}
+.ringNum {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--charcoal);
+  line-height: 1;
+}
+.ringPct {
+  font-size: 0.75rem;
+  color: var(--stone);
+  align-self: flex-start;
+  margin-top: 6px;
+}
+
+/* Precautions */
+.precautionsCard {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  padding: 28px 32px;
+  box-shadow: var(--shadow);
+}
+.secHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.secIcon { color: var(--sage-dark); }
+.secHeader h2 { font-size: 1.2rem; }
+
+.precautionsList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.precautionItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: var(--warm);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.urgentItem {
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-weight: 500;
+}
+.precNum {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--sage-dark);
+  font-weight: 500;
+  flex-shrink: 0;
+  min-width: 24px;
+}
+.urgentItem .precNum { color: var(--danger); }
+
+/* Probability */
+.probCard {
+  background: #fff;
+  border-radius: var(--radius-lg);
+  padding: 24px 32px;
+  box-shadow: var(--shadow);
+}
+.probToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  text-align: left;
+  color: var(--charcoal);
+}
+.probToggle h2 { font-size: 1.1rem; }
+.probBars {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+  overflow: hidden;
+}
+.probRow {
+  display: grid;
+  grid-template-columns: 180px 1fr 52px;
+  align-items: center;
+  gap: 12px;
+}
+.probLabel { font-size: 0.82rem; color: var(--stone); }
+.probBarTrack {
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.probBarFill {
+  height: 100%;
+  background: var(--sage-light);
+  border-radius: 4px;
+}
+.probBarTop { background: var(--sage-dark); }
+.probPct { font-size: 0.82rem; font-weight: 600; color: var(--charcoal); text-align: right; }
+
+/* Disclaimer */
+.disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--warm);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  font-size: 0.82rem;
+  color: var(--stone);
+  line-height: 1.5;
+}
+.disclaimer svg { flex-shrink: 0; margin-top: 1px; color: var(--gold); }
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-bottom: 16px;
+}
+.newBtn {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--sage);
+  color: #fff;
+  padding: 12px 22px;
+  border-radius: var(--radius);
+  font-size: 0.92rem;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.newBtn:hover { background: var(--sage-dark); }
+.homeBtn2 {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--warm);
+  color: var(--charcoal);
+  padding: 12px 22px;
+  border-radius: var(--radius);
+  font-size: 0.92rem;
+  border: 1.5px solid #ddd;
+  transition: background 0.15s;
+}
+.homeBtn2:hover { background: #e8e0d6; }
+
+@media (max-width: 480px) {
+  .diseaseTop { flex-direction: column; }
+  .probRow { grid-template-columns: 130px 1fr 42px; }
+  .precautionsCard, .diseaseCard, .probCard { padding: 20px; }
+}
