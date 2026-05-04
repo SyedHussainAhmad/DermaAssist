@@ -1,0 +1,8 @@
+{
+  "name": "derma-assist",
+  "private": true,
+  "scripts": {
+    "vercel-install": "npm install --prefix frontend",
+    "vercel-build": "npm run build --prefix frontend"
+  }
+}
