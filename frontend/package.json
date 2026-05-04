@@ -8,7 +8,7 @@
     "build": "node ./node_modules/vite/bin/vite.js build",
     "preview": "vite preview",
     "vercel-install": "npm install",
-    "vercel-build": "npm run build"
+    "vercel-build": "npm run build && node -e \"const fs=require('fs'); if (fs.existsSync('../package.json')) { fs.rmSync('../dist', { recursive: true, force: true }); fs.cpSync('dist', '../dist', { recursive: true }); }\""
   },
   "dependencies": {
     "react": "^18.3.1",

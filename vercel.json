@@ -1,5 +1,5 @@
 {
   "installCommand": "npm run vercel-install",
   "buildCommand": "npm run vercel-build",
-  "outputDirectory": "frontend/dist"
+  "outputDirectory": "dist"
 }
