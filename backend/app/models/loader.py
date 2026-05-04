@@ -32,18 +32,6 @@ DISEASE_CLASSES = [
     "vitiligo",
 ]
 
-# Simple keywords for demo predictions
-KEYWORD_MAP = {
-    "this": "acne",
-    "the": "eczema",
-    "that": "basal_cell_carcinoma",
-    "it": "melanoma",
-    "here": "psoriasis",
-    "there": "rosacea",
-    "now": "urticaria",
-    "then": "vitiligo",
-}
-
 DISEASE_DISPLAY = {
     "acne":                  "Acne",
     "basal_cell_carcinoma":  "Basal Cell Carcinoma",
@@ -199,12 +187,6 @@ class ModelManager:
         Run inference.
         Returns: {disease, display_name, description, confidence, precautions, urgent, probabilities}
         """
-        # Check for demo keyword in notes
-        notes = tabular_features.get("notes", "").lower()
-        for word in notes.split():
-            if word in KEYWORD_MAP:
-                return _build_demo_result(KEYWORD_MAP[word])
-
         # ── Prepare image ──
         pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         img_tensor = VAL_TRANSFORM(pil_img).unsqueeze(0)
