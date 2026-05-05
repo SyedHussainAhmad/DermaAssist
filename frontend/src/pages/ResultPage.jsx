@@ -27,8 +27,9 @@ const KEYWORD_MAP = {
   then: 'vitiligo',
 }
 
-const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions'
-const DEEPSEEK_API_KEY = 'sk-2ce56c9e43e24c7a9daf426597b78cf4'
+const OPENAI_API_URL = 'https://api.openai.com/v1/responses'
+const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY
+const OPENAI_MODEL = 'gpt-4.1'
 const MODEL_RUN_DELAY = 4500
 
 const DISEASE_DETAILS = {
@@ -151,7 +152,7 @@ export default function ResultPage() {
         const keywordDisease = findDiseaseFromNotes(answers?.notes)
         const resultPromise = keywordDisease
           ? Promise.resolve(buildResult(keywordDisease, 95))
-          : buildDeepSeekResult(answers, imageB64)
+          : buildOpenAIResult(answers, imageB64)
 
         const [nextResult] = await Promise.all([
           resultPromise,
@@ -354,32 +355,62 @@ export default function ResultPage() {
   )
 }
 
-async function buildDeepSeekResult(answers, imageB64) {
-  if (!DEEPSEEK_API_KEY) {
+async function buildOpenAIResult(answers, imageB64) {
+  if (!OPENAI_API_KEY) {
     throw new Error('Prediction model is not configured.')
   }
 
-  const response = await fetch(DEEPSEEK_API_URL, {
+  const response = await fetch(OPENAI_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'deepseek-chat',
-      messages: [
+      model: OPENAI_MODEL,
+      input: [
         {
           role: 'system',
-          content: buildDeepSeekSystemPrompt(),
+          content: buildOpenAISystemPrompt(),
         },
         {
           role: 'user',
-          content: buildDeepSeekUserPrompt(answers, imageB64),
+          content: [
+            {
+              type: 'input_text',
+              text: buildOpenAIUserPrompt(answers),
+            },
+            {
+              type: 'input_image',
+              image_url: imageB64,
+              detail: 'high',
+            },
+          ],
         },
       ],
-      response_format: { type: 'json_object' },
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'derma_assist_prediction',
+          strict: true,
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              disease: {
+                type: 'string',
+                enum: DISEASE_CLASSES,
+              },
+              confidence: {
+                type: 'number',
+              },
+            },
+            required: ['disease', 'confidence'],
+          },
+        },
+      },
       temperature: 0,
-      max_tokens: 120,
+      max_output_tokens: 150,
     }),
   })
 
@@ -388,7 +419,7 @@ async function buildDeepSeekResult(answers, imageB64) {
   }
 
   const data = await response.json()
-  const content = data?.choices?.[0]?.message?.content
+  const content = extractOpenAIOutputText(data)
   if (!content) {
     throw new Error('Prediction model returned an empty response.')
   }
@@ -439,14 +470,27 @@ function buildProbabilities(selectedDisease, selectedConfidence = 95) {
   }, {})
 }
 
-function buildDeepSeekSystemPrompt() {
+function extractOpenAIOutputText(data) {
+  if (data?.output_text) return data.output_text
+
+  const textParts = []
+  for (const item of data?.output || []) {
+    for (const content of item?.content || []) {
+      if (typeof content?.text === 'string') textParts.push(content.text)
+    }
+  }
+
+  return textParts.join('').trim()
+}
+
+function buildOpenAISystemPrompt() {
   return `
-You are DermaAssist's dermatology triage classifier. Your task is to approximate the single most likely output class that an image-plus-questionnaire skin screening model would choose, using only the text questionnaire and submitted image metadata provided to you.
+You are DermaAssist's dermatology image-and-questionnaire triage classifier. Your task is to approximate the single most likely output class that a skin screening model would choose using BOTH the submitted skin image and the questionnaire text.
 
 Critical limitations:
 - This is a screening classifier, not a medical diagnosis.
-- The image bytes are not available to you. Do not claim that you inspected the visual image.
-- Treat image metadata only as evidence that an image was submitted; base the class on the questionnaire values and notes.
+- You may inspect the image for visible dermatology-relevant patterns, but do not provide medical advice or explanations.
+- Combine visual evidence with questionnaire values. If they conflict, prioritize clearly visible image evidence, then red-flag questionnaire details, then the rest of the form.
 - You must still choose exactly one supported class, even when evidence is incomplete.
 
 Supported classes:
@@ -458,6 +502,16 @@ Supported classes:
 - rosacea
 - urticaria
 - vitiligo
+
+Visual interpretation guidance:
+- acne: comedones, pustules, papules, inflamed spots, cyst-like bumps, especially on face/back/chest.
+- basal_cell_carcinoma: pearly or translucent bump, rolled border, ulcer/crust, bleeding/scabbed non-healing sore, sun-exposed skin.
+- eczema: dry inflamed patches, rough irritated skin, redness with dryness, excoriation/scratch marks, diffuse rash.
+- melanoma: dark or multi-colored pigmented lesion, asymmetry, irregular border, visible evolution concern, atypical mole-like lesion.
+- psoriasis: thick sharply demarcated plaques, silvery/white scale, scalp/elbow/knee-like plaque patterns.
+- rosacea: central facial redness, flushing, cheek/nose redness, visible vessels, acne-like bumps without blackheads.
+- urticaria: raised wheals/welts, swollen transient-looking plaques, allergy-like bumps.
+- vitiligo: well-demarcated white/de-pigmented patches without scale.
 
 Questionnaire field interpretation:
 - duration: days/weeks suggests acute; months/years suggests chronic or recurring.
@@ -505,30 +559,18 @@ Example json output:
 `.trim()
 }
 
-function buildDeepSeekUserPrompt(answers, imageB64) {
-  const imageMeta = getImageMetadata(imageB64)
+function buildOpenAIUserPrompt(answers) {
   return `
 Return json for this DermaAssist submission.
 
 Questionnaire answers:
 ${JSON.stringify(answers, null, 2)}
 
-Submitted image metadata:
-${JSON.stringify(imageMeta, null, 2)}
+The attached image is the user's submitted skin photo. Use it together with the questionnaire.
 
-Remember: output only json in this exact shape:
+Return only json in this exact shape:
 {"disease":"eczema","confidence":74}
 `.trim()
-}
-
-function getImageMetadata(imageB64 = '') {
-  const [header = '', payload = ''] = String(imageB64).split(',')
-  const mimeMatch = header.match(/^data:([^;]+);base64$/)
-  return {
-    provided: Boolean(payload),
-    mimeType: mimeMatch?.[1] || 'unknown',
-    approximateSizeBytes: payload ? Math.round((payload.length * 3) / 4) : 0,
-  }
 }
 
 function normalizeDiseaseClass(value) {
