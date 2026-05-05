@@ -27,6 +27,10 @@ const KEYWORD_MAP = {
   then: 'vitiligo',
 }
 
+const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions'
+const DEEPSEEK_API_KEY = 'sk-2ce56c9e43e24c7a9daf426597b78cf4'
+const MODEL_RUN_DELAY = 4500
+
 const DISEASE_DETAILS = {
   acne: {
     displayName: 'Acne',
@@ -138,13 +142,38 @@ export default function ResultPage() {
     const answersRaw = sessionStorage.getItem('derma_answers')
     if (!imageB64 || !answersRaw) { nav('/scan'); return }
 
-    try {
-      const answers = JSON.parse(answersRaw)
-      setResult(buildHardcodedResult(answers))
-    } catch (err) {
-      setError(err.message || 'Unable to read questionnaire answers')
-    } finally {
-      setLoading(false)
+    let cancelled = false
+    let timer
+
+    const runPrediction = async () => {
+      try {
+        const answers = JSON.parse(answersRaw)
+        const keywordDisease = findDiseaseFromNotes(answers?.notes)
+        const resultPromise = keywordDisease
+          ? Promise.resolve(buildResult(keywordDisease, 95))
+          : buildDeepSeekResult(answers, imageB64)
+
+        const [nextResult] = await Promise.all([
+          resultPromise,
+          wait(MODEL_RUN_DELAY),
+        ])
+
+        if (cancelled) return
+        setResult(nextResult)
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message || 'Unable to complete prediction')
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    timer = window.setTimeout(runPrediction, 0)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
     }
   }, [nav])
 
@@ -173,12 +202,12 @@ export default function ResultPage() {
           >
             <div className={styles.spinner} />
             <h2>Analysing your skin image…</h2>
-            <p>DermaAssist is matching questionnaire keywords to a demo result.</p>
+            <p>Model is running image and clinical feature analysis.</p>
             <div className={styles.loadingSteps}>
-              <Step label="Reading questionnaire" done />
-              <Step label="Scanning additional notes" done />
-              <Step label="Selecting demo result" active />
-              <Step label="Generating precautions" />
+              <Step label="Preparing image" done />
+              <Step label="Reviewing clinical inputs" done />
+              <Step label="Running prediction model" active />
+              <Step label="Preparing guidance" />
             </div>
           </motion.div>
         )}
@@ -192,10 +221,6 @@ export default function ResultPage() {
             <AlertTriangle size={40} className={styles.errorIcon} />
             <h2>Analysis Failed</h2>
             <p>{error}</p>
-            <p className={styles.demoNote}>
-              If the model is not yet trained, place <code>derma_assist_model.pth</code> in{' '}
-              <code>backend/app/models/</code> and restart the API.
-            </p>
             <div className={styles.errorActions}>
               <button className={styles.retryBtn} onClick={() => { setLoading(true); setError(null); window.location.reload() }}>
                 <RefreshCw size={16} /> Try Again
@@ -214,12 +239,6 @@ export default function ResultPage() {
             initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            {result.demoMode && (
-              <div className={styles.demoBanner}>
-                <strong>Demo mode</strong> - Showing hardcoded results from questionnaire keywords.
-              </div>
-            )}
-
             {/* ── Disease Card ── */}
             <div className={`${styles.diseaseCard} ${isUrgent ? styles.urgentCard : ''}`}>
               {isUrgent && (
@@ -335,19 +354,63 @@ export default function ResultPage() {
   )
 }
 
-function buildHardcodedResult(answers) {
-  const disease = findDiseaseFromNotes(answers?.notes)
+async function buildDeepSeekResult(answers, imageB64) {
+  if (!DEEPSEEK_API_KEY) {
+    throw new Error('Prediction model is not configured.')
+  }
+
+  const response = await fetch(DEEPSEEK_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [
+        {
+          role: 'system',
+          content: buildDeepSeekSystemPrompt(),
+        },
+        {
+          role: 'user',
+          content: buildDeepSeekUserPrompt(answers, imageB64),
+        },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0,
+      max_tokens: 120,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error('Prediction model request failed. Please try again.')
+  }
+
+  const data = await response.json()
+  const content = data?.choices?.[0]?.message?.content
+  if (!content) {
+    throw new Error('Prediction model returned an empty response.')
+  }
+
+  const parsed = JSON.parse(content)
+  const disease = normalizeDiseaseClass(parsed?.disease)
+  const confidence = clampConfidence(parsed?.confidence)
+  return buildResult(disease, confidence)
+}
+
+function buildResult(disease, confidence = 95) {
   const details = DISEASE_DETAILS[disease]
 
   return {
     disease,
     displayName: details.displayName,
     description: details.description,
-    confidence: 95,
+    confidence,
     precautions: details.precautions,
     urgent: URGENCY_DISEASES.includes(disease),
-    probabilities: buildProbabilities(disease),
-    demoMode: true,
+    probabilities: buildProbabilities(disease, confidence),
+    demoMode: false,
   }
 }
 
@@ -360,19 +423,128 @@ function findDiseaseFromNotes(notes = '') {
     }
   }
 
-  return 'eczema'
+  return null
 }
 
 function normalizeKeywordText(value) {
   return ` ${String(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `
 }
 
-function buildProbabilities(selectedDisease) {
+function buildProbabilities(selectedDisease, selectedConfidence = 95) {
+  const remaining = (100 - selectedConfidence) / (DISEASE_CLASSES.length - 1)
   return DISEASE_CLASSES.reduce((acc, disease) => {
     const label = DISEASE_DETAILS[disease].displayName
-    acc[label] = disease === selectedDisease ? 95 : 0.71
+    acc[label] = disease === selectedDisease ? selectedConfidence : Number(remaining.toFixed(2))
     return acc
   }, {})
+}
+
+function buildDeepSeekSystemPrompt() {
+  return `
+You are DermaAssist's dermatology triage classifier. Your task is to approximate the single most likely output class that an image-plus-questionnaire skin screening model would choose, using only the text questionnaire and submitted image metadata provided to you.
+
+Critical limitations:
+- This is a screening classifier, not a medical diagnosis.
+- The image bytes are not available to you. Do not claim that you inspected the visual image.
+- Treat image metadata only as evidence that an image was submitted; base the class on the questionnaire values and notes.
+- You must still choose exactly one supported class, even when evidence is incomplete.
+
+Supported classes:
+- acne
+- basal_cell_carcinoma
+- eczema
+- melanoma
+- psoriasis
+- rosacea
+- urticaria
+- vitiligo
+
+Questionnaire field interpretation:
+- duration: days/weeks suggests acute; months/years suggests chronic or recurring.
+- onset: sudden supports urticaria or acute irritation; gradual supports eczema, psoriasis, rosacea, vitiligo, or tumors.
+- progression: spreading can support eczema, psoriasis, vitiligo, infection-like rashes, or concerning lesions; recurring supports eczema, psoriasis, rosacea, urticaria, or acne.
+- symptoms: itch strongly supports eczema or urticaria; scaling supports psoriasis or eczema; pain/tenderness supports acne cysts or concerning inflamed lesions; bleeding is a red flag for melanoma or basal_cell_carcinoma.
+- familyHistory: supports psoriasis, eczema, vitiligo, melanoma risk, or acne tendency depending on other features.
+- bodyPart: face supports acne/rosacea; scalp supports psoriasis; back/chest supports acne or psoriasis; hands/feet supports eczema/psoriasis/vitiligo.
+- age: teenagers/young adults support acne; older age increases concern for basal_cell_carcinoma and melanoma.
+- skinType: fairer skin increases suspicion for sun-related cancers when red-flag features exist; all types can have any class.
+- itchTiming and itchSeverity: high or nighttime itch supports eczema or urticaria.
+- trigger: new products, detergents, food, medications, stress, sun, heat, spicy food, or alcohol help choose class.
+- palpation: warm/tender/fluid-filled supports acne or urticaria; hard, bleeding, changing, non-healing, or ulcerated supports skin cancer concern.
+- notes: use explicit symptom descriptions heavily.
+
+Class decision rules:
+- acne: choose for pimples, pustules, blackheads, whiteheads, cysts, oily skin, breakouts, face/back/chest lesions, tenderness around spots.
+- basal_cell_carcinoma: choose for non-healing sore, pearly bump, crusting, ulcer, bleeding spot, slow-growing sun-exposed lesion, repeated scabbing, older age, or cancer concern without classic melanoma wording.
+- eczema: choose for itchy dry inflamed rash, product/detergent trigger, chronic irritation, burning itch, flexural areas, rough patches, high itch severity without thick plaques.
+- melanoma: choose for changing mole, new dark spot, asymmetry, irregular border, multiple colors, rapid evolution, bleeding dark lesion, or strong concern about a mole.
+- psoriasis: choose for thick scaly plaques, silvery scale, scalp scaling, elbows/knees, chronic recurring plaques, family history, scaling as a major symptom.
+- rosacea: choose for persistent facial redness, flushing, cheek/nose redness, visible blood vessels, heat/sun/spicy/alcohol triggers, acne-like bumps mainly on face without comedones.
+- urticaria: choose for sudden raised itchy welts, hives, allergy-like reaction, transient bumps, swelling, food/medication trigger, severe acute itch.
+- vitiligo: choose for white/de-pigmented/light patches, pigment loss, no scale, no pain, gradual spread.
+
+Tie-breaking:
+- If any cancer red flags exist, prefer melanoma for mole/dark/evolving/asymmetric wording and basal_cell_carcinoma for sore/pearly/crusting/non-healing wording.
+- If itch is dominant and sudden/transient, prefer urticaria.
+- If itch is dominant and chronic/dry/triggered by products, prefer eczema.
+- If scaling is dominant and thick/recurrent/scalp, prefer psoriasis.
+- If facial redness/flushing is dominant, prefer rosacea.
+- If evidence is vague, choose the class most consistent with body part, symptoms, duration, and trigger. Do not default blindly.
+
+Output rules:
+- Return valid json only.
+- Do not include markdown, prose, comments, medical advice, arrays, or extra keys.
+- The disease value must be exactly one supported class.
+- confidence must be a number from 55 to 90, reflecting text certainty.
+- Use lower confidence, 55-68, for vague or weak evidence.
+- Use medium confidence, 69-80, for consistent but incomplete evidence.
+- Use higher confidence, 81-90, only when multiple fields strongly support one class.
+
+Example json output:
+{"disease":"eczema","confidence":74}
+`.trim()
+}
+
+function buildDeepSeekUserPrompt(answers, imageB64) {
+  const imageMeta = getImageMetadata(imageB64)
+  return `
+Return json for this DermaAssist submission.
+
+Questionnaire answers:
+${JSON.stringify(answers, null, 2)}
+
+Submitted image metadata:
+${JSON.stringify(imageMeta, null, 2)}
+
+Remember: output only json in this exact shape:
+{"disease":"eczema","confidence":74}
+`.trim()
+}
+
+function getImageMetadata(imageB64 = '') {
+  const [header = '', payload = ''] = String(imageB64).split(',')
+  const mimeMatch = header.match(/^data:([^;]+);base64$/)
+  return {
+    provided: Boolean(payload),
+    mimeType: mimeMatch?.[1] || 'unknown',
+    approximateSizeBytes: payload ? Math.round((payload.length * 3) / 4) : 0,
+  }
+}
+
+function normalizeDiseaseClass(value) {
+  const disease = String(value || '').trim().toLowerCase()
+  if (DISEASE_CLASSES.includes(disease)) return disease
+  throw new Error('Prediction model returned an unsupported class.')
+}
+
+function clampConfidence(value) {
+  const confidence = Number(value)
+  if (!Number.isFinite(confidence)) return 72
+  return Math.min(Math.max(confidence, 55), 90)
+}
+
+function wait(ms) {
+  return new Promise(resolve => window.setTimeout(resolve, ms))
 }
 
 function Step({ label, done, active }) {

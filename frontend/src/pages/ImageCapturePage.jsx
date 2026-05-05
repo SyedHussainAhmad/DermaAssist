@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Upload, RotateCcw, ArrowRight, ArrowLeft, X, CheckCircle } from 'lucide-react'
+import { Camera, Upload, RotateCcw, ArrowRight, ArrowLeft, X } from 'lucide-react'
 import styles from './ImageCapturePage.module.css'
 
 export default function ImageCapturePage() {
@@ -218,16 +218,6 @@ export default function ImageCapturePage() {
               >
                 <div className={styles.previewImgContainer}>
                   <img src={capturedImage.url} alt="Captured skin" className={styles.previewImg} />
-                  <div className={styles.previewBadge}><CheckCircle size={16} /> Image ready</div>
-                </div>
-                <div className={styles.previewTips}>
-                  <p>✅ Good image checklist:</p>
-                  <ul>
-                    <li>Affected area clearly visible</li>
-                    <li>Good lighting (no harsh flash shadows)</li>
-                    <li>In focus and not blurry</li>
-                    <li>Area fills most of the frame</li>
-                  </ul>
                 </div>
                 <div className={styles.previewActions}>
                   <button className={styles.retakeBtn} onClick={reset}>

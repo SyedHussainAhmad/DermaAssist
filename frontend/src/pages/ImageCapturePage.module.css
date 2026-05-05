@@ -244,29 +244,6 @@
   object-fit: contain;
   background: #f5f5f5;
 }
-.previewBadge {
-  position: absolute;
-  bottom: 12px; left: 12px;
-  background: rgba(74,110,80,0.9);
-  color: #fff;
-  padding: 6px 14px;
-  border-radius: 99px;
-  font-size: 0.82rem;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.previewTips {
-  background: var(--warm);
-  border-radius: var(--radius);
-  padding: 16px 20px;
-  font-size: 0.84rem;
-  color: var(--stone);
-}
-.previewTips p { font-weight: 600; margin-bottom: 8px; color: var(--charcoal); }
-.previewTips ul { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-.previewTips li::before { content: '· '; color: var(--sage); }
-
 .previewActions {
   display: flex;
   gap: 12px;
